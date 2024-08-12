@@ -5,7 +5,11 @@ const Comment = require("../Models/commentModel");
 //-------------------------CREATE POST---------------------------------------
 const createPost = async (req, res) => {
     req.body.user = req.user._id; // Associate the post with the current user
-    const newPost = new Post(req.body);
+    const newPost = new Post({
+        user: req.body.user,
+        description: req.body.description, // Use 'description' to match your schema
+        imgurl: req.body.imgurl, // Use 'imgurl' to match your schema
+    });
     try {
         await newPost.save();
         res.status(200).send({
@@ -19,6 +23,7 @@ const createPost = async (req, res) => {
         });
     }
 };
+
 
 //-------------------------UPDATE POST---------------------------------------
 const updatePost = async (req, res) => {
