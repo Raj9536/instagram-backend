@@ -1,12 +1,12 @@
 const express = require("express");
 const connectDB = require("./database/db");
 const cors = require("cors");
+const { verify } = require("./controllers/authController"); 
 const userRoute = require("./Routes/userRoutes");
-const postRoute = require("./Routes/postRoutes"); // Import post routes
-const commentRoute = require("./Routes/commentRoute"); // Import comment routes
+const postRoute = require("./Routes/postRoutes");
+const commentRoute = require("./Routes/commentRoute");
 const PORT = 8000;
-require('dotenv').config(); // Load environment variables from .env file
-
+require('dotenv').config(); 
 const app = express();
 
 connectDB();
@@ -16,10 +16,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Implement `verify` 
+app.use((req, res, next) => {
+    if (req.path === "/api/v1/users/login" || req.path === "/api/v1/users/signup") {
+        return next(); 
+    }
+    verify(req, res, next); 
+});
+
 // Define routes
 app.use("/api/v1/users", userRoute);
-app.use("/api/v1/posts", postRoute); // Define routes for posts
-app.use("/api/v1/posts", commentRoute); // Define routes for comments under posts
+app.use("/api/v1/posts", postRoute);
+app.use("/api/v1/comments", commentRoute);
 
 // Handle undefined routes
 app.use("*", (req, res) => {
