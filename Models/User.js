@@ -36,7 +36,7 @@ const UserSchema = new mongoose.Schema({
   followings: {
     type: Array,
     default: [],
-},
+  },
   role: {
     type: String,
     enum: ["admin", "user"],
@@ -47,6 +47,11 @@ const UserSchema = new mongoose.Schema({
     type: String,
     enum: ["male", "female"],
   },
+  posts: {
+    type: Array,
+    default: [],
+  }
+  
 });
 
 module.exports = mongoose.model("User", UserSchema);

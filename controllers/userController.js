@@ -1,12 +1,12 @@
-const User = require("../Models/User");
+const User = require("../Models/User"); // Ensure you have a Post model imported
 
 //-------------------------SEARCH USERS--------------------------------
 const searchUsers = async (req, res) => {
     try {
-        const { query } = req.query; // get search query from query parameters
+        const { query } = req.query; // Get search query from query parameters
         const users = await User.find({
-            username: { $regex: query, $options: "i" } // search by username, case-insensitive
-        }).select("-password"); // exclude password from response
+            username: { $regex: query, $options: "i" } // Search by username, case-insensitive
+        }).select("-password"); // Exclude password from response
 
         res.status(200).json({
             status: "success",
@@ -23,7 +23,7 @@ const searchUsers = async (req, res) => {
 //-------------------------GET USER BY USERNAME-----------------------
 const getUserByUsername = async (req, res) => {
     try {
-        const { username } = req.params; // get username from URL parameters
+        const { username } = req.params; // Get username from URL parameters
         const user = await User.findOne({ username: username }).select("-password");
 
         if (!user) {
@@ -48,7 +48,7 @@ const getUserByUsername = async (req, res) => {
 //-------------------------GET USER BY ID-------------------------------------
 const getUser = async (req, res) => {
     try {
-        const { id } = req.params; // get user ID from URL parameters
+        const { id } = req.params; // Get user ID from URL parameters
         const user = await User.findById(id).select("-password");
 
         if (!user) {
@@ -73,7 +73,7 @@ const getUser = async (req, res) => {
 //-------------------------GET FOLLOWINGS------------------------------
 const getFollowings = async (req, res) => {
     try {
-        const { username } = req.params; // get username from URL parameters
+        const { username } = req.params; // Get username from URL parameters
         const user = await User.findOne({ username: username });
 
         if (!user) {
@@ -84,7 +84,7 @@ const getFollowings = async (req, res) => {
         }
 
         const followings = await User.find({
-            _id: { $in: user.following } // Update field name to "following"
+            _id: { $in: user.followings } // Ensure field name matches your schema
         }).select("-password");
 
         res.status(200).json({
@@ -102,7 +102,7 @@ const getFollowings = async (req, res) => {
 //-------------------------GET FOLLOWERS------------------------------
 const getFollowers = async (req, res) => {
     try {
-        const { username } = req.params; // get username from URL parameters
+        const { username } = req.params; // Get username from URL parameters
         const user = await User.findOne({ username: username });
 
         if (!user) {
@@ -113,7 +113,7 @@ const getFollowers = async (req, res) => {
         }
 
         const followers = await User.find({
-            _id: { $in: user.followers }
+            _id: { $in: user.followers } // Ensure field name matches your schema
         }).select("-password");
 
         res.status(200).json({
@@ -128,14 +128,41 @@ const getFollowers = async (req, res) => {
     }
 };
 
+//------------------------------GET NUMBER OF POSTS-----------------------------
+const getPostsCount = async (req, res) => {
+    try {
+        const { username } = req.params; // get username from URL parameters
+        const user = await User.findOne({ username: username });
+        if (!user) {
+            return res.status(404).json({
+                status: "failure",
+                message: "User not found"
+            });
+        }
+        // The number of posts is the length of the 'posts' array
+        const postsCount = user.posts.length;
+        res.status(200).json({
+            status: "success",
+            data: { postsCount }
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: "failure",
+            message: error.message
+        });
+    }
+}
+
+
 //-------------------------UPDATE USER----------------------------------
 const updateUser = async (req, res) => {
     try {
-        const { id } = req.params; // get user ID from URL parameters
-        const updatedData = req.body; // get updated data from request body
+        const { id } = req.params; // Get user ID from URL parameters
+        const updatedData = req.body; // Get updated data from request body
+
         const user = await User.findByIdAndUpdate(id, updatedData, {
-            new: true, // return the updated document
-            runValidators: true // validate the data before updating
+            new: true, // Return the updated document
+            runValidators: true // Validate the data before updating
         }).select("-password");
 
         if (!user) {
@@ -203,7 +230,6 @@ const followUnfollowUser = async (req, res) => {
     }
 };
 
-
 module.exports = {
     searchUsers,
     getUserByUsername,
@@ -211,5 +237,6 @@ module.exports = {
     getFollowings,
     getFollowers,
     updateUser,
-    followUnfollowUser
+    followUnfollowUser,
+    getPostsCount // Ensure getPosts is exported correctly
 };
