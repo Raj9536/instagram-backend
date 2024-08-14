@@ -1,21 +1,29 @@
-const User = require("../Models/User"); // Ensure you have a Post model imported
+const User = require('../Models/User'); // Ensure you have the User model imported
 
 //-------------------------SEARCH USERS--------------------------------
 const searchUsers = async (req, res) => {
     try {
         const { query } = req.query; // Get search query from query parameters
-        const users = await User.find({
-            username: { $regex: query, $options: "i" } // Search by username, case-insensitive
-        }).select("-password"); // Exclude password from response
+
+        let users;
+        if (query === '*') {
+            // Return all users if query is '*'
+            users = await User.find({}).select("-password");
+        } else {
+            users = await User.find({
+                username: { $regex: query, $options: "i" } // Search by username, case-insensitive
+            }).select("-password");
+        }
 
         res.status(200).json({
             status: "success",
             data: users
         });
     } catch (error) {
+        console.error('Error fetching users:', error);
         res.status(500).json({
             status: "failure",
-            message: error.message
+            message: "Internal Server Error"
         });
     }
 };
@@ -24,7 +32,7 @@ const searchUsers = async (req, res) => {
 const getUserByUsername = async (req, res) => {
     try {
         const { username } = req.params; // Get username from URL parameters
-        const user = await User.findOne({ username: username }).select("-password");
+        const user = await User.findOne({ username }).select("-password");
 
         if (!user) {
             return res.status(404).json({
@@ -38,9 +46,10 @@ const getUserByUsername = async (req, res) => {
             data: user
         });
     } catch (error) {
+        console.error('Error fetching user by username:', error);
         res.status(500).json({
             status: "failure",
-            message: error.message
+            message: "Internal Server Error"
         });
     }
 };
@@ -63,9 +72,10 @@ const getUser = async (req, res) => {
             data: user
         });
     } catch (error) {
+        console.error('Error fetching user by ID:', error);
         res.status(500).json({
             status: "failure",
-            message: error.message
+            message: "Internal Server Error"
         });
     }
 };
@@ -74,7 +84,7 @@ const getUser = async (req, res) => {
 const getFollowings = async (req, res) => {
     try {
         const { username } = req.params; // Get username from URL parameters
-        const user = await User.findOne({ username: username });
+        const user = await User.findOne({ username });
 
         if (!user) {
             return res.status(404).json({
@@ -92,9 +102,10 @@ const getFollowings = async (req, res) => {
             data: followings
         });
     } catch (error) {
+        console.error('Error fetching followings:', error);
         res.status(500).json({
             status: "failure",
-            message: error.message
+            message: "Internal Server Error"
         });
     }
 };
@@ -103,7 +114,7 @@ const getFollowings = async (req, res) => {
 const getFollowers = async (req, res) => {
     try {
         const { username } = req.params; // Get username from URL parameters
-        const user = await User.findOne({ username: username });
+        const user = await User.findOne({ username });
 
         if (!user) {
             return res.status(404).json({
@@ -121,9 +132,10 @@ const getFollowers = async (req, res) => {
             data: followers
         });
     } catch (error) {
+        console.error('Error fetching followers:', error);
         res.status(500).json({
             status: "failure",
-            message: error.message
+            message: "Internal Server Error"
         });
     }
 };
@@ -131,8 +143,8 @@ const getFollowers = async (req, res) => {
 //------------------------------GET NUMBER OF POSTS-----------------------------
 const getPostsCount = async (req, res) => {
     try {
-        const { username } = req.params; // get username from URL parameters
-        const user = await User.findOne({ username: username });
+        const { username } = req.params; // Get username from URL parameters
+        const user = await User.findOne({ username });
         if (!user) {
             return res.status(404).json({
                 status: "failure",
@@ -146,13 +158,13 @@ const getPostsCount = async (req, res) => {
             data: { postsCount }
         });
     } catch (error) {
+        console.error('Error fetching posts count:', error);
         res.status(500).json({
             status: "failure",
-            message: error.message
+            message: "Internal Server Error"
         });
     }
-}
-
+};
 
 //-------------------------UPDATE USER----------------------------------
 const updateUser = async (req, res) => {
@@ -177,9 +189,10 @@ const updateUser = async (req, res) => {
             data: user
         });
     } catch (error) {
+        console.error('Error updating user:', error);
         res.status(500).json({
             status: "failure",
-            message: error.message
+            message: "Internal Server Error"
         });
     }
 };
@@ -226,7 +239,30 @@ const followUnfollowUser = async (req, res) => {
             });
         }
     } catch (error) {
-        res.status(500).json({ status: "failure", message: error.message });
+        console.error('Error following/unfollowing user:', error);
+        res.status(500).json({ status: "failure", message: "Internal Server Error" });
+    }
+};
+//-------------------------FETCH RANDOM USERS--------------------------------
+const fetchRandomUsers = async (req, res) => {
+    try {
+        const users = await User.aggregate([{ $sample: { size: 5 } }]); // Fetch up to 5 random users
+        if (users.length === 0) {
+            return res.status(404).json({
+                status: "failure",
+                message: "No users found"
+            });
+        }
+        res.status(200).json({
+            status: "success",
+            data: users
+        });
+    } catch (error) {
+        console.error('Error fetching random users:', error);
+        res.status(500).json({
+            status: "failure",
+            message: "Internal Server Error"
+        });
     }
 };
 
@@ -238,5 +274,6 @@ module.exports = {
     getFollowers,
     updateUser,
     followUnfollowUser,
-    getPostsCount // Ensure getPosts is exported correctly
+    getPostsCount,
+    fetchRandomUsers // Ensure getPostsCount is exported correctly
 };

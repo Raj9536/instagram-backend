@@ -15,6 +15,7 @@ router.get("/user/:id", userController.getUser); // Get user by ID
 router.get("/:username/followings", userController.getFollowings); // Get followings
 router.get("/:username/followers", userController.getFollowers); // Get followers
 router.get("/:username/posts", userController.getPostsCount); // Get number of posts
+router.get("/suggest/random", userController.fetchRandomUsers);
 
 // Authentication middleware required for update, follow, and unfollow routes
 router.put("/user/:id", userController.updateUser); // Update user by ID
