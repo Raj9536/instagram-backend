@@ -6,16 +6,17 @@ const { verify } = require("./controllers/authController");
 const userRoute = require("./Routes/userRoutes");
 const postRoute = require("./Routes/postRoutes");
 const commentRoute = require("./Routes/commentRoute");
-const multer = require('multer');
+const multer = require('multer');  // Keep multer as it's needed for file uploads
 require('dotenv').config();
 const app = express();
-const PORT = 8000;
+const PORT = process.env.PORT || 8000; // Use environment variable for PORT or fallback to 8000
 
+// Connect to the database
 connectDB();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'http://localhost:3000', // Allow requests from your frontend
 }));
 
 app.use(express.json());
@@ -27,10 +28,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Set up Multer storage and file handling
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads'));
+    cb(null, path.join(__dirname, 'uploads')); // Save files to the uploads directory
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    cb(null, `${Date.now()}-${file.originalname}`); // Append a timestamp to the original file name
   }
 });
 
@@ -59,7 +60,7 @@ app.use((req, res, next) => {
 
 // Define routes
 app.use("/api/v1/users", userRoute);
-app.use("/api/v1/posts", postRoute);
+app.use("/api/v1/posts", postRoute); // Post routes will handle file uploads
 app.use("/api/v1/comments", commentRoute);
 
 // Handle undefined routes
@@ -68,4 +69,4 @@ app.use("*", (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

@@ -4,17 +4,20 @@ const Comment = require("../Models/commentModel");
 
 //-------------------------CREATE POST---------------------------------------
 const createPost = async (req, res) => {
-    req.body.user = req.user._id; // Associate the post with the current user
+    const imgurl = req.file ? `/uploads/${req.file.filename}` : null;
+
     const newPost = new Post({
-        user: req.body.user,
-        description: req.body.description, // Use 'description' to match your schema
-        imgurl: req.body.imgurl, // Use 'imgurl' to match your schema
+        user: req.user._id, // Associate the post with the current user
+        description: req.body.description,
+        imgurl: imgurl, // Store the image URL
     });
+
     try {
         await newPost.save();
         res.status(200).send({
             status: "success",
             message: "Post has been created",
+            data: newPost,
         });
     } catch (e) {
         res.status(500).send({
@@ -23,7 +26,6 @@ const createPost = async (req, res) => {
         });
     }
 };
-
 
 //-------------------------UPDATE POST---------------------------------------
 const updatePost = async (req, res) => {
