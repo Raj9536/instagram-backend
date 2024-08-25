@@ -1,17 +1,18 @@
-const User = require('../Models/User'); // Ensure you have the User model imported
+const User = require('../Models/User');
+const fs = require('fs');
+const path = require('path');
 
 //-------------------------SEARCH USERS--------------------------------
 const searchUsers = async (req, res) => {
     try {
-        const { query } = req.query; // Get search query from query parameters
+        const { query } = req.query;
 
         let users;
         if (query === '*') {
-            // Return all users if query is '*'
             users = await User.find({}).select("-password");
         } else {
             users = await User.find({
-                username: { $regex: query, $options: "i" } // Search by username, case-insensitive
+                username: { $regex: query, $options: "i" }
             }).select("-password");
         }
 
@@ -31,7 +32,7 @@ const searchUsers = async (req, res) => {
 //-------------------------GET USER BY USERNAME-----------------------
 const getUserByUsername = async (req, res) => {
     try {
-        const { username } = req.params; // Get username from URL parameters
+        const { username } = req.params;
         const user = await User.findOne({ username }).select("-password");
 
         if (!user) {
@@ -39,6 +40,11 @@ const getUserByUsername = async (req, res) => {
                 status: "failure",
                 message: "User not found"
             });
+        }
+
+        // Prepend the base URL to the profilePicture path if it exists
+        if (user.profilePicture) {
+            user.profilePicture = `http://localhost:8000/${user.profilePicture}`;
         }
 
         res.status(200).json({
@@ -57,7 +63,7 @@ const getUserByUsername = async (req, res) => {
 //-------------------------GET USER BY ID-------------------------------------
 const getUser = async (req, res) => {
     try {
-        const { id } = req.params; // Get user ID from URL parameters
+        const { id } = req.params;
         const user = await User.findById(id).select("-password");
 
         if (!user) {
@@ -65,6 +71,11 @@ const getUser = async (req, res) => {
                 status: "failure",
                 message: "User not found"
             });
+        }
+
+        // Prepend the base URL to the profilePicture path if it exists
+        if (user.profilePicture) {
+            user.profilePicture = `http://localhost:8000/${user.profilePicture}`;
         }
 
         res.status(200).json({
@@ -83,7 +94,7 @@ const getUser = async (req, res) => {
 //-------------------------GET FOLLOWINGS------------------------------
 const getFollowings = async (req, res) => {
     try {
-        const { username } = req.params; // Get username from URL parameters
+        const { username } = req.params;
         const user = await User.findOne({ username });
 
         if (!user) {
@@ -94,7 +105,7 @@ const getFollowings = async (req, res) => {
         }
 
         const followings = await User.find({
-            _id: { $in: user.followings } // Ensure field name matches your schema
+            _id: { $in: user.followings }
         }).select("-password");
 
         res.status(200).json({
@@ -113,7 +124,7 @@ const getFollowings = async (req, res) => {
 //-------------------------GET FOLLOWERS------------------------------
 const getFollowers = async (req, res) => {
     try {
-        const { username } = req.params; // Get username from URL parameters
+        const { username } = req.params;
         const user = await User.findOne({ username });
 
         if (!user) {
@@ -124,7 +135,7 @@ const getFollowers = async (req, res) => {
         }
 
         const followers = await User.find({
-            _id: { $in: user.followers } // Ensure field name matches your schema
+            _id: { $in: user.followers }
         }).select("-password");
 
         res.status(200).json({
@@ -143,7 +154,7 @@ const getFollowers = async (req, res) => {
 //------------------------------GET NUMBER OF POSTS-----------------------------
 const getPostsCount = async (req, res) => {
     try {
-        const { username } = req.params; // Get username from URL parameters
+        const { username } = req.params;
         const user = await User.findOne({ username });
         if (!user) {
             return res.status(404).json({
@@ -151,7 +162,7 @@ const getPostsCount = async (req, res) => {
                 message: "User not found"
             });
         }
-        // The number of posts is the length of the 'posts' array
+
         const postsCount = user.posts.length;
         res.status(200).json({
             status: "success",
@@ -169,12 +180,28 @@ const getPostsCount = async (req, res) => {
 //-------------------------UPDATE USER----------------------------------
 const updateUser = async (req, res) => {
     try {
-        const { id } = req.params; // Get user ID from URL parameters
-        const updatedData = req.body; // Get updated data from request body
+        const { id } = req.params;
+        const updatedData = req.body;
 
+        // Handle profile picture upload
+        if (req.file) {
+            const filePath = `uploads/${req.file.filename}`;
+            updatedData.profilePicture = filePath;
+
+            const user = await User.findById(id);
+            if (user && user.profilePicture && user.profilePicture !== 'YOUR_DEFAULT_AVATAR_URL') {
+                fs.unlink(path.join(__dirname, '..', user.profilePicture), (err) => {
+                    if (err) {
+                        console.error('Error deleting old profile picture:', err);
+                    }
+                });
+            }
+        }
+
+        // Update user and ensure the username is part of the response
         const user = await User.findByIdAndUpdate(id, updatedData, {
-            new: true, // Return the updated document
-            runValidators: true // Validate the data before updating
+            new: true,
+            runValidators: true,
         }).select("-password");
 
         if (!user) {
@@ -182,6 +209,11 @@ const updateUser = async (req, res) => {
                 status: "failure",
                 message: "User not found"
             });
+        }
+
+        // Prepend the base URL to the profilePicture path if it exists
+        if (user.profilePicture) {
+            user.profilePicture = `http://localhost:8000/${user.profilePicture}`;
         }
 
         res.status(200).json({
@@ -200,7 +232,7 @@ const updateUser = async (req, res) => {
 //-------------------------FOLLOW/UNFOLLOW USER----------------------------------
 const followUnfollowUser = async (req, res) => {
     try {
-        const currentUser = await User.findById(req.user._id); // Ensure currentUser is fetched by ID
+        const currentUser = await User.findById(req.user._id);
         if (!currentUser) {
             return res.status(404).json({ status: "failure", message: "Current user not found" });
         }
@@ -210,7 +242,6 @@ const followUnfollowUser = async (req, res) => {
             return res.status(404).json({ status: "failure", message: "User to follow/unfollow not found" });
         }
 
-        // Initialize arrays if they are undefined
         if (!currentUser.followings) {
             currentUser.followings = [];
         }
@@ -218,9 +249,7 @@ const followUnfollowUser = async (req, res) => {
             userToFollowOrUnfollow.followers = [];
         }
 
-        // Check if the user is already followed or not
         if (!currentUser.followings.includes(userToFollowOrUnfollow._id)) {
-            // Follow the user
             await currentUser.updateOne({ $push: { followings: userToFollowOrUnfollow._id } });
             await userToFollowOrUnfollow.updateOne({ $push: { followers: currentUser._id } });
 
@@ -229,7 +258,6 @@ const followUnfollowUser = async (req, res) => {
                 message: `You have followed ${userToFollowOrUnfollow.username}`,
             });
         } else {
-            // Unfollow the user
             await currentUser.updateOne({ $pull: { followings: userToFollowOrUnfollow._id } });
             await userToFollowOrUnfollow.updateOne({ $pull: { followers: currentUser._id } });
 
@@ -243,10 +271,11 @@ const followUnfollowUser = async (req, res) => {
         res.status(500).json({ status: "failure", message: "Internal Server Error" });
     }
 };
+
 //-------------------------FETCH RANDOM USERS--------------------------------
 const fetchRandomUsers = async (req, res) => {
     try {
-        const users = await User.aggregate([{ $sample: { size: 5 } }]); // Fetch up to 5 random users
+        const users = await User.aggregate([{ $sample: { size: 5 } }]);
         if (users.length === 0) {
             return res.status(404).json({
                 status: "failure",
@@ -275,5 +304,5 @@ module.exports = {
     updateUser,
     followUnfollowUser,
     getPostsCount,
-    fetchRandomUsers // Ensure getPostsCount is exported correctly
+    fetchRandomUsers
 };
