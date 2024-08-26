@@ -7,17 +7,25 @@ const createPost = async (req, res) => {
     const imgurl = req.file ? `/uploads/${req.file.filename}` : null;
 
     const newPost = new Post({
-        user: req.user._id, // Associate the post with the current user
+        user: req.user._id,
         description: req.body.description,
-        imgurl: imgurl, // Store the image URL
+        imgurl: imgurl,
     });
 
     try {
-        await newPost.save();
+        const savedPost = await newPost.save();
+
+        // Update the user's posts array with the new post ID
+        await User.findByIdAndUpdate(
+            req.user._id,
+            { $push: { posts: savedPost._id } },
+            { new: true }
+        );
+
         res.status(200).send({
             status: "success",
-            message: "Post has been created",
-            data: newPost,
+            message: "Post has been created and added to user profile",
+            data: savedPost,
         });
     } catch (e) {
         res.status(500).send({
@@ -88,7 +96,7 @@ const getTimeline = async (req, res) => {
             .limit(limit)
             .sort({ createdAt: "desc" })
             .populate("user", "username profilePicture");
-        
+
         const followingsPosts = await Promise.all(
             user.followings.map((followingId) => {
                 return Post.find({
@@ -127,7 +135,16 @@ const getPostsUser = async (req, res) => {
             });
         }
         const posts = await Post.find({ user: user._id });
-        res.status(200).json(posts);
+
+        // Map the posts to include the full URL for imgurl
+        const postsWithFullImgUrl = posts.map(post => {
+            return {
+                ...post._doc,
+                imgurl: post.imgurl ? `http://localhost:8000${post.imgurl}` : null
+            };
+        });
+
+        res.status(200).json(postsWithFullImgUrl);
     } catch (e) {
         res.status(500).send({
             status: "failure",
