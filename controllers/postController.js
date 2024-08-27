@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Post = require("../Models/postModel");
 const User = require("../Models/User");
 const Comment = require("../Models/commentModel");
@@ -156,6 +157,10 @@ const getPostsUser = async (req, res) => {
 //-------------------------GET SINGLE POST------------------------------------
 const getPost = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ status: 'failure', message: 'Invalid post ID' });
+        }
+
         const post = await Post.findById(req.params.id).populate("user");
         if (!post) {
             return res.status(404).send({
@@ -175,6 +180,10 @@ const getPost = async (req, res) => {
 //-------------------------LIKE/UNLIKE POST------------------------------------
 const likeUnlike = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ status: 'failure', message: 'Invalid post ID' });
+        }
+
         const post = await Post.findById(req.params.id);
         if (!post) {
             return res.status(404).send({
@@ -204,6 +213,67 @@ const likeUnlike = async (req, res) => {
     }
 };
 
+//-------------------------GET RANDOM POSTS------------------------------------
+const getRandomPosts = async (req, res) => {
+    try {
+        let { fetchedPostIds = [] } = req.query;
+        const limit = parseInt(req.query.limit) || 10;
+
+        // If fetchedPostIds is provided, ensure it is an array and contains valid ObjectIds
+        if (typeof fetchedPostIds === 'string') {
+            fetchedPostIds = fetchedPostIds.split(',');
+        }
+        
+        fetchedPostIds = fetchedPostIds
+            .filter(id => mongoose.Types.ObjectId.isValid(id))
+            .map(id => mongoose.Types.ObjectId(id));
+
+        const query = {
+            _id: { $nin: fetchedPostIds }, // Exclude already fetched posts
+        };
+
+        const randomPosts = await Post.aggregate([
+            { $match: query },
+            { $sample: { size: limit } }, // Randomly select posts
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'user',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'comments',
+                    localField: '_id',
+                    foreignField: 'post',
+                    as: 'comments'
+                }
+            },
+            {
+                $project: {
+                    'user.password': 0, // Exclude sensitive data
+                    'comments.__v': 0,
+                }
+            },
+        ]);
+
+        res.status(200).json({
+            status: 'success',
+            posts: randomPosts,
+            limit: randomPosts.length,
+        });
+    } catch (e) {
+        res.status(500).json({
+            status: 'failure',
+            message: e.message,
+        });
+    }
+};
+
+
 module.exports = {
     createPost,
     updatePost,
@@ -212,4 +282,5 @@ module.exports = {
     getPostsUser,
     getPost,
     likeUnlike,
+    getRandomPosts,
 };

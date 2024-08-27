@@ -41,4 +41,6 @@ router.put("/:id", authController.verify, postController.updatePost); // Update 
 router.delete("/:id", authController.verify, postController.deletePost); // Delete a post by ID
 router.put("/:id/like", authController.verify, postController.likeUnlike); // Like/Unlike a post
 
+router.get("/random", authController.verify, postController.getRandomPosts); // Get random posts
+
 module.exports = router;
