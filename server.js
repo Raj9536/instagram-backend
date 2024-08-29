@@ -2,12 +2,13 @@ const express = require("express");
 const connectDB = require("./database/db");
 const cors = require("cors");
 const path = require("path");
-const { verify } = require("./controllers/authController");
+const multer = require('multer');
+const { verify } = require("./controllers/authController"); // Assuming verify is a middleware function for authentication
 const userRoute = require("./Routes/userRoutes");
 const postRoute = require("./Routes/postRoutes");
 const commentRoute = require("./Routes/commentRoute");
-const multer = require('multer');  
 require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 8000;
 
@@ -50,18 +51,19 @@ const upload = multer({
   }
 });
 
-// Implement `verify` middleware, but skip it for login and signup routes
-app.use((req, res, next) => {
-  if (req.path === "/api/v1/users/login" || req.path === "/api/v1/users/signup") {
-    return next();
-  }
-  verify(req, res, next);
-});
-
 // Define routes
 app.use("/api/v1/users", userRoute);
 app.use("/api/v1/posts", postRoute);
 app.use("/api/v1/comments", commentRoute);
+
+// Example /me route for fetching logged-in user data
+app.get('/api/v1/auth/me', verify, (req, res) => {
+  // Assuming req.user is populated by verify middleware
+  if (!req.user) {
+    return res.status(401).json({ status: 'failure', message: 'Unauthorized' });
+  }
+  res.status(200).json({ status: 'success', user: req.user });
+});
 
 // Handle undefined routes
 app.use("*", (req, res) => {

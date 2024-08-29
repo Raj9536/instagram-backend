@@ -5,15 +5,18 @@ const mongoose = require("mongoose");
 // Add a comment to a post
 const addComment = async (req, res) => {
     try {
-        const { post, description } = req.body;
+        const { description } = req.body;
+        const postId = req.params.postId; // Get postId from the request parameters
 
-        if (!mongoose.Types.ObjectId.isValid(post)) {
+        // Validate the postId as a MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(postId)) {
             return res.status(400).send({
                 status: "failure",
                 message: "Invalid post ID",
             });
         }
 
+        // Check if description is provided
         if (!description) {
             return res.status(400).send({
                 status: "failure",
@@ -24,21 +27,27 @@ const addComment = async (req, res) => {
         // Create and save the new comment
         const comment = new Comment({
             user: req.user._id,
-            post,
+            post: postId,
             description,
         });
 
         const savedComment = await comment.save();
         console.log("Comment saved:", savedComment);
 
-        // Update the post by adding the comment ID
+        // Update the post by adding the comment ID and populate the user field in comments
         const updatedPost = await Post.findByIdAndUpdate(
-            post,
+            postId,
             { 
                 $push: { comments: savedComment._id } 
             },
             { new: true, useFindAndModify: false }
-        );
+        ).populate({
+            path: 'comments',
+            populate: {
+                path: 'user',
+                select: 'username profilePicture', // Include username and profile picture
+            }
+        });
 
         if (!updatedPost) {
             return res.status(404).send({
@@ -52,7 +61,7 @@ const addComment = async (req, res) => {
         res.status(200).send({
             status: "success",
             message: "Comment has been created and post updated",
-            post: updatedPost, // return the updated post for debugging
+            post: updatedPost, // return the updated post with populated comments
         });
     } catch (e) {
         console.error("Error adding comment:", e.message);
@@ -65,10 +74,25 @@ const addComment = async (req, res) => {
 
 // Get comments by post ID
 const getbyPostId = async (req, res) => {
-    const postId = req.params.postId;
+    const postId = req.params.postId; // Get postId from the request parameters
 
     try {
-        const post = await Post.findById(postId).populate("comments");
+        // Validate the postId as a MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(postId)) {
+            return res.status(400).send({
+                status: "failure",
+                message: "Invalid post ID",
+            });
+        }
+
+        const post = await Post.findById(postId).populate({
+            path: "comments",
+            populate: {
+                path: "user",
+                select: "username profilePicture", // include username and profile picture
+            }
+        });
+
         if (!post) {
             return res.status(404).json({
                 status: "failure",

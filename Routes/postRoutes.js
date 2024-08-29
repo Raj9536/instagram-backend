@@ -32,15 +32,16 @@ const upload = multer({
 
 // Public routes
 router.post("/", authController.verify, upload.single('imgurl'), postController.createPost); // Create a new post
-router.get("/:id", postController.getPost); // Get a single post by ID
-router.get("/user/:username", postController.getPostsUser); // Get posts by a specific user
-router.get("/timeline", authController.verify, postController.getTimeline); // Get timeline for authenticated user
 
-// Authentication middleware required for update and delete routes
+// Authentication required routes
+router.get("/random", authController.verify, postController.getRandomPosts); // Get random posts
+router.get("/timeline", authController.verify, postController.getTimeline); // Get timeline for authenticated user
+router.put("/:id/like", authController.verify, postController.likeUnlike); // Like/Unlike a post
 router.put("/:id", authController.verify, postController.updatePost); // Update a post by ID
 router.delete("/:id", authController.verify, postController.deletePost); // Delete a post by ID
-router.put("/:id/like", authController.verify, postController.likeUnlike); // Like/Unlike a post
 
-router.get("/random", authController.verify, postController.getRandomPosts); // Get random posts
+// Public routes (placed after specific routes)
+router.get("/user/:username", postController.getPostsUser); // Get posts by a specific user
+router.get("/:id", postController.getPost); // Get a single post by ID
 
 module.exports = router;

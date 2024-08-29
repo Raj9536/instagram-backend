@@ -16,7 +16,6 @@ const createPost = async (req, res) => {
     try {
         const savedPost = await newPost.save();
 
-        // Update the user's posts array with the new post ID
         await User.findByIdAndUpdate(
             req.user._id,
             { $push: { posts: savedPost._id } },
@@ -26,7 +25,10 @@ const createPost = async (req, res) => {
         res.status(200).send({
             status: "success",
             message: "Post has been created and added to user profile",
-            data: savedPost,
+            data: {
+                ...savedPost._doc,
+                imgurl: savedPost.imgurl ? `http://localhost:8000${savedPost.imgurl}` : null,
+            },
         });
     } catch (e) {
         res.status(500).send({
@@ -85,40 +87,124 @@ const deletePost = async (req, res) => {
     }
 };
 
+//-------------------------GET RANDOM POSTS------------------------------------
+const getRandomPosts = async (req, res) => {
+    try {
+        let fetchedPostIds = req.query.fetchedPostIds || [];
+        if (typeof fetchedPostIds === 'string') {
+            fetchedPostIds = fetchedPostIds.split(',');
+        }
+
+        fetchedPostIds = fetchedPostIds
+            .filter(id => mongoose.Types.ObjectId.isValid(id))
+            .map(id => mongoose.Types.ObjectId(id));
+
+        const query = { _id: { $nin: fetchedPostIds } };
+
+        const randomPosts = await Post.aggregate([
+            { $match: query },
+            { $sample: { size: 1000 } }, // Fetch up to 1000 posts randomly, increase as needed
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'user',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'comments',
+                    localField: '_id',
+                    foreignField: 'post',
+                    as: 'comments'
+                }
+            },
+            {
+                $project: {
+                    'user.password': 0,
+                    'comments.__v': 0,
+                    '__v': 0
+                }
+            }
+        ]);
+
+        if (!randomPosts.length) {
+            return res.status(404).json({
+                status: 'failure',
+                message: 'No posts found'
+            });
+        }
+
+        const randomPostsWithFullImgUrl = randomPosts.map(post => ({
+            ...post,
+            imgurl: post.imgurl ? `http://localhost:8000${post.imgurl}` : null,
+            user: {
+                ...post.user,
+                profilePicture: post.user.profilePicture ? `http://localhost:8000${post.user.profilePicture}` : null,
+            }
+        }));
+
+        res.status(200).json({
+            status: 'success',
+            posts: randomPostsWithFullImgUrl,
+        });
+    } catch (e) {
+        console.error('Error fetching random posts:', e.message);
+        res.status(500).json({
+            status: 'failure',
+            message: 'Internal Server Error',
+        });
+    }
+};
+
 //-------------------------GET TIMELINE---------------------------------------
 const getTimeline = async (req, res) => {
     try {
         const userId = req.user._id;
         const page = parseInt(req.query.page) - 1 || 0;
         const limit = parseInt(req.query.limit) || 10;
-        const user = await User.findById(userId).select("followings");
+
+        // Get the user's own posts
         const myPosts = await Post.find({ user: userId })
             .skip(page * limit)
             .limit(limit)
             .sort({ createdAt: "desc" })
             .populate("user", "username profilePicture");
 
-        const followingsPosts = await Promise.all(
-            user.followings.map((followingId) => {
-                return Post.find({
-                    user: followingId,
-                    createdAt: { $gte: new Date(new Date().getTime() - 86400000) }
-                })
-                    .skip(page * limit)
-                    .limit(limit)
-                    .sort({ createdAt: "desc" })
-                    .populate("user", "username profilePicture");
-            })
-        );
+        // Get the posts from the users the current user is following
+        const user = await User.findById(userId).select("followings");
+        const followingsPosts = await Post.find({
+            user: { $in: user.followings },
+        })
+            .skip(page * limit)
+            .limit(limit)
+            .sort({ createdAt: "desc" })
+            .populate("user", "username profilePicture");
 
-        const allPosts = myPosts.concat(...followingsPosts);
-        res.status(200).send({
+        // Combine the user's own posts with the posts from the users they follow
+        const allPosts = [...myPosts, ...followingsPosts];
+
+        // Map the posts to include full URLs for images and profile pictures
+        const postsWithFullImgUrl = allPosts.map((post) => ({
+            ...post._doc,
+            imgurl: post.imgurl ? `http://localhost:8000${post.imgurl}` : null,
+            user: {
+                ...post.user._doc,
+                profilePicture: post.user.profilePicture
+                    ? `http://localhost:8000${post.user.profilePicture}`
+                    : null,
+            },
+        }));
+
+        res.status(200).json({
             status: "success",
-            posts: allPosts,
-            limit: allPosts.length,
+            posts: postsWithFullImgUrl,
+            limit: postsWithFullImgUrl.length,
         });
     } catch (e) {
-        res.status(500).send({
+        res.status(500).json({
             status: "failure",
             message: e.message,
         });
@@ -137,13 +223,10 @@ const getPostsUser = async (req, res) => {
         }
         const posts = await Post.find({ user: user._id });
 
-        // Map the posts to include the full URL for imgurl
-        const postsWithFullImgUrl = posts.map(post => {
-            return {
-                ...post._doc,
-                imgurl: post.imgurl ? `http://localhost:8000${post.imgurl}` : null
-            };
-        });
+        const postsWithFullImgUrl = posts.map(post => ({
+            ...post._doc,
+            imgurl: post.imgurl ? `http://localhost:8000${post.imgurl}` : null
+        }));
 
         res.status(200).json(postsWithFullImgUrl);
     } catch (e) {
@@ -168,7 +251,17 @@ const getPost = async (req, res) => {
                 message: "Post not found",
             });
         }
-        res.status(200).json(post);
+
+        const postWithFullImgUrl = {
+            ...post._doc,
+            imgurl: post.imgurl ? `http://localhost:8000${post.imgurl}` : null,
+            user: {
+                ...post.user._doc,
+                profilePicture: post.user.profilePicture ? `http://localhost:8000${post.user.profilePicture}` : null,
+            }
+        };
+
+        res.status(200).json(postWithFullImgUrl);
     } catch (e) {
         res.status(500).send({
             status: "failure",
@@ -212,67 +305,6 @@ const likeUnlike = async (req, res) => {
         });
     }
 };
-
-//-------------------------GET RANDOM POSTS------------------------------------
-const getRandomPosts = async (req, res) => {
-    try {
-        let { fetchedPostIds = [] } = req.query;
-        const limit = parseInt(req.query.limit) || 10;
-
-        // If fetchedPostIds is provided, ensure it is an array and contains valid ObjectIds
-        if (typeof fetchedPostIds === 'string') {
-            fetchedPostIds = fetchedPostIds.split(',');
-        }
-        
-        fetchedPostIds = fetchedPostIds
-            .filter(id => mongoose.Types.ObjectId.isValid(id))
-            .map(id => mongoose.Types.ObjectId(id));
-
-        const query = {
-            _id: { $nin: fetchedPostIds }, // Exclude already fetched posts
-        };
-
-        const randomPosts = await Post.aggregate([
-            { $match: query },
-            { $sample: { size: limit } }, // Randomly select posts
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'user',
-                    foreignField: '_id',
-                    as: 'user'
-                }
-            },
-            { $unwind: '$user' },
-            {
-                $lookup: {
-                    from: 'comments',
-                    localField: '_id',
-                    foreignField: 'post',
-                    as: 'comments'
-                }
-            },
-            {
-                $project: {
-                    'user.password': 0, // Exclude sensitive data
-                    'comments.__v': 0,
-                }
-            },
-        ]);
-
-        res.status(200).json({
-            status: 'success',
-            posts: randomPosts,
-            limit: randomPosts.length,
-        });
-    } catch (e) {
-        res.status(500).json({
-            status: 'failure',
-            message: e.message,
-        });
-    }
-};
-
 
 module.exports = {
     createPost,
