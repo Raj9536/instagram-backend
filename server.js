@@ -3,7 +3,7 @@ const connectDB = require("./database/db");
 const cors = require("cors");
 const path = require("path");
 const multer = require('multer');
-const { verify } = require("./controllers/authController"); // Assuming verify is a middleware function for authentication
+const { verify } = require("./controllers/authController"); 
 const userRoute = require("./Routes/userRoutes");
 const postRoute = require("./Routes/postRoutes");
 const commentRoute = require("./Routes/commentRoute");
@@ -56,9 +56,7 @@ app.use("/api/v1/users", userRoute);
 app.use("/api/v1/posts", postRoute);
 app.use("/api/v1/comments", commentRoute);
 
-// Example /me route for fetching logged-in user data
 app.get('/api/v1/auth/me', verify, (req, res) => {
-  // Assuming req.user is populated by verify middleware
   if (!req.user) {
     return res.status(401).json({ status: 'failure', message: 'Unauthorized' });
   }
