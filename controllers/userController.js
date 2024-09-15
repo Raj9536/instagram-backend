@@ -232,45 +232,57 @@ const updateUser = async (req, res) => {
 //-------------------------FOLLOW/UNFOLLOW USER----------------------------------
 const followUnfollowUser = async (req, res) => {
     try {
-        const currentUser = await User.findById(req.user._id);
+        // Extract current user's ID from the request body
+        const currentUserId = req.body.userId;
+        if (!currentUserId) {
+            return res.status(400).json({ status: "failure", message: "Current user ID is missing in the request body" });
+        }
+
+        // Find the user to follow/unfollow by their username
+        const userToFollowOrUnfollow = await User.findOne({ username: req.params.username });
+        if (!userToFollowOrUnfollow) {
+            return res.status(404).json({ status: "failure", message: "User not found" });
+        }
+
+        // Find the current user by their ID
+        const currentUser = await User.findById(currentUserId);
         if (!currentUser) {
             return res.status(404).json({ status: "failure", message: "Current user not found" });
         }
 
-        const userToFollowOrUnfollow = await User.findOne({ username: req.params.username });
-        if (!userToFollowOrUnfollow) {
-            return res.status(404).json({ status: "failure", message: "User to follow/unfollow not found" });
+        // Prevent users from following themselves
+        if (currentUser._id.equals(userToFollowOrUnfollow._id)) {
+            return res.status(400).json({ status: "failure", message: "You cannot follow yourself" });
         }
 
-        if (!currentUser.followings) {
-            currentUser.followings = [];
-        }
-        if (!userToFollowOrUnfollow.followers) {
-            userToFollowOrUnfollow.followers = [];
-        }
-
+        // Check if the current user is already following the target user
         if (!currentUser.followings.includes(userToFollowOrUnfollow._id)) {
+            // Follow the user
             await currentUser.updateOne({ $push: { followings: userToFollowOrUnfollow._id } });
             await userToFollowOrUnfollow.updateOne({ $push: { followers: currentUser._id } });
 
-            res.status(200).json({
+            return res.status(200).json({
                 status: "success",
                 message: `You have followed ${userToFollowOrUnfollow.username}`,
             });
         } else {
+            // Unfollow the user
             await currentUser.updateOne({ $pull: { followings: userToFollowOrUnfollow._id } });
             await userToFollowOrUnfollow.updateOne({ $pull: { followers: currentUser._id } });
 
-            res.status(200).json({
+            return res.status(200).json({
                 status: "success",
                 message: `You have unfollowed ${userToFollowOrUnfollow.username}`,
             });
         }
     } catch (error) {
-        console.error('Error following/unfollowing user:', error);
-        res.status(500).json({ status: "failure", message: "Internal Server Error" });
+        return res.status(500).json({
+            status: "failure",
+            message: error.message,
+        });
     }
 };
+
 
 //-------------------------FETCH RANDOM USERS--------------------------------
 const fetchRandomUsers = async (req, res) => {
